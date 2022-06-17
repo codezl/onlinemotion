@@ -196,7 +196,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
 
             }
         } catch (Exception e) {
-            log.error("消息格式错误,来自{}", THREAD_LOCAL_USER.get());
+            log.error("消息{}格式错误,来自{}", msg,THREAD_LOCAL_USER.get());
             dto.setMsgType(503);
             nowCtx.channel().write(new TextWebSocketFrame(JSONObject.toJSONString(dto)));
         }
