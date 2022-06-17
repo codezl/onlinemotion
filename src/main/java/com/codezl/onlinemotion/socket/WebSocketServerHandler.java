@@ -179,22 +179,26 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
                 nowCtx.channel().write(new TextWebSocketFrame(JSONObject.toJSONString(dto)));
             }else if (msgType == 1) {
                 String receiver = THREAD_LOCAL_RECEIVER.get();
+                // 或者通过信息传递
+                // String recv = miniappMsg.getReceiverUser();
                 ChannelHandlerContext recCtx = onlineWs.get(receiver);
                 if (recCtx == null) {
-                    dto.setMsg("用户下线");
+                    dto.setMsg("用户不在线");
                     nowCtx.channel().write(new TextWebSocketFrame(JSONObject.toJSONString(dto)));
                 }else {
                     dto.setMsg(miniappMsg.getMsg());
-                    dto.setFromUser(miniappMsg.getReceiverUser());
-                    recCtx.channel().writeAndFlush(new TextWebSocketFrame());
+                    dto.setFromUser(THREAD_LOCAL_USER.get());
+                    recCtx.channel().writeAndFlush(new TextWebSocketFrame(JSONObject.toJSONString(dto)));
                 }
             }else if (msgType == 2) {
-
+                //  双人聊天
             }else {
 
             }
         } catch (Exception e) {
             log.error("消息格式错误,来自{}", THREAD_LOCAL_USER.get());
+            dto.setMsgType(503);
+            nowCtx.channel().write(new TextWebSocketFrame(JSONObject.toJSONString(dto)));
         }
         return dto;
     }
