@@ -26,6 +26,8 @@ public class MsgTransferDto {
     public static class miniappMsg extends commonMsg{
         private int receiverId;
         private String receiverChannelId;
+        // 信息类型，处理方式不同
+        private int msgType;
         // private int senderId;
     }
 
