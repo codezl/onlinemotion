@@ -72,7 +72,9 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
         //接收到的消息，可进行后续操作
         String protocol = ((TextWebSocketFrame) frame).text();
         //消息返回
-        ctx.channel().write(new TextWebSocketFrame(protocol + "欢迎使用Netty WebSocket服务，现在时刻:" + new Date().toString()));
+        //ctx.channel().write(new TextWebSocketFrame(protocol + "欢迎使用Netty WebSocket服务，现在时刻:" + new Date().toString()));
+        dlewithRecMsg(protocol,ctx);
+        // 额外信息处理
         ChannelHandlerContext zs = onlineWs.get("/zs");
         if (zs == null) {
             return;
@@ -121,6 +123,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
                 // 做一些数据库初始化操作，比如初始化联系人（可能为掉线重连）
                 // 为了节省内存，也可以将建立连接的初始化数据，返回到客户端，保存在用户端
                 THREAD_LOCAL_RECEIVER.set("/zs");
+                initData();
             } else {
                 //消息返回
                 ctx.channel().writeAndFlush(new TextWebSocketFrame("socket连接路径为空"));
@@ -162,19 +165,47 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
     }
 
     //
-    public static MsgTransferDto.serverMsg dlewithRecMsg(String msg,ChannelHandlerContext ctx) {
+    public static MsgTransferDto.serverMsg dlewithRecMsg(String msg,ChannelHandlerContext nowCtx) {
         MsgTransferDto.serverMsg dto = new MsgTransferDto.serverMsg();
         if (msg == null) {
             return dto;
         }
         try {
             MsgTransferDto.miniappMsg miniappMsg = JSONObject.parseObject(msg, MsgTransferDto.miniappMsg.class);
+            int msgType = miniappMsg.getMsgType();
+            dto.setMsgType(msgType);
+            if (msgType == 0) {
+                dto.setMsg("系统收到信息");
+                nowCtx.channel().write(new TextWebSocketFrame(JSONObject.toJSONString(dto)));
+            }else if (msgType == 1) {
+                String receiver = THREAD_LOCAL_RECEIVER.get();
+                ChannelHandlerContext recCtx = onlineWs.get(receiver);
+                if (recCtx == null) {
+                    dto.setMsg("用户下线");
+                    nowCtx.channel().write(new TextWebSocketFrame(JSONObject.toJSONString(dto)));
+                }else {
+                    dto.setMsg(miniappMsg.getMsg());
+                    dto.setFromUser(miniappMsg.getReceiverUser());
+                    recCtx.channel().writeAndFlush(new TextWebSocketFrame());
+                }
+            }else if (msgType == 2) {
 
+            }else {
+
+            }
         } catch (Exception e) {
             log.error("消息格式错误,来自{}", THREAD_LOCAL_USER.get());
         }
         return dto;
     }
+
+    /**
+     * 初始化连接数据
+     */
+    public void initData() {
+        // Data...
+    }
+
 
     /**
      * 清除缓存方法
