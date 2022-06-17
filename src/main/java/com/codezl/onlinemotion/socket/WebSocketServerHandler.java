@@ -138,6 +138,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         cause.printStackTrace();
+        clearThreadCache();
         ctx.close();
     }
 
@@ -157,11 +158,11 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
         super.channelInactive(ctx);
         logger.error("连接关闭" + THREAD_LOCAL_USER.get());
         // 必须调用remove，防止内存泄露
-        THREAD_LOCAL_USER.remove();
+        clearThreadCache();
     }
 
     //
-    public static MsgTransferDto.serverMsg dlewithRecMsg(String msg) {
+    public static MsgTransferDto.serverMsg dlewithRecMsg(String msg,ChannelHandlerContext ctx) {
         MsgTransferDto.serverMsg dto = new MsgTransferDto.serverMsg();
         if (msg == null) {
             return dto;
@@ -173,6 +174,14 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
             log.error("消息格式错误,来自{}", THREAD_LOCAL_USER.get());
         }
         return dto;
+    }
+
+    /**
+     * 清除缓存方法
+     */
+    public void clearThreadCache() {
+        THREAD_LOCAL_USER.remove();
+        THREAD_LOCAL_RECEIVER.remove();
     }
 
 }
