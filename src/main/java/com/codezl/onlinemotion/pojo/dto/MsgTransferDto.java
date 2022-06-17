@@ -20,6 +20,7 @@ public class MsgTransferDto {
         private String msg;
         private Date msgTime;
         // 信息类型，处理方式不同(0是发送给系统的消息。1是双人位置通信，2是双人聊天)
+        // 503 系统错误
         private int msgType;
     }
 
