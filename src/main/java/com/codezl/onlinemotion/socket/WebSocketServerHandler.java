@@ -167,7 +167,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
     //
     public static MsgTransferDto.serverMsg dlewithRecMsg(String msg,ChannelHandlerContext nowCtx) {
         MsgTransferDto.serverMsg dto = new MsgTransferDto.serverMsg();
-        if (msg == null) {
+        if (msg == null || "".equals(msg)) {
             return dto;
         }
         try {
@@ -196,6 +196,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
 
             }
         } catch (Exception e) {
+            e.printStackTrace();
             log.error("消息{}格式错误,来自{}", msg,THREAD_LOCAL_USER.get());
             dto.setMsgType(503);
             nowCtx.channel().write(new TextWebSocketFrame(JSONObject.toJSONString(dto)));
