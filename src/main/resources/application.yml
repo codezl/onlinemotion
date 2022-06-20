@@ -5,6 +5,15 @@ spring:
     username: online_motion
     password: nneP3N26E6Bphrj6
     driver-class-name: com.mysql.cj.jdbc.Driver
+  redis:
+    host: 106.52.38.218
+    port: 6379
+    password: root12345
+    lettuce:
+      pool:
+        max-wait: 5000
+    database: 0
+
 
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml

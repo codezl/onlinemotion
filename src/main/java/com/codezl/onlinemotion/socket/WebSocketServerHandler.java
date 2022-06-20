@@ -36,6 +36,8 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
     // 使用ThreadLocal存储当前socket线程的用户信息，做到线程数据隔离，并且最后记得清除，避免内存泄露
     private static final ThreadLocal<String> THREAD_LOCAL_USER = new ThreadLocal<>();
     private static final ThreadLocal<String> THREAD_LOCAL_RECEIVER = new ThreadLocal<>();
+    // 除了记录reciever也可以使用聊天室的形式进行消息传递
+    private static final ThreadLocal<String> THREAD_CHATROOM = new ThreadLocal<>();
 
     protected void messageReceived(ChannelHandlerContext ctx, Object msg) throws Exception {
         //传统的HTTP接入
@@ -75,11 +77,11 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
         //ctx.channel().write(new TextWebSocketFrame(protocol + "欢迎使用Netty WebSocket服务，现在时刻:" + new Date().toString()));
         dlewithRecMsg(protocol,ctx);
         // 额外信息处理
-        ChannelHandlerContext zs = onlineWs.get("/zs");
-        if (zs == null) {
-            return;
-        }
-        zs.channel().writeAndFlush(new TextWebSocketFrame("发给zs信息"));
+        // ChannelHandlerContext zs = onlineWs.get("/zs");
+        // if (zs == null) {
+        //     return;
+        // }
+        // zs.channel().writeAndFlush(new TextWebSocketFrame("发给zs信息"));
     }
 
     private static void sendHttpResponse(ChannelHandlerContext ctx, FullHttpRequest req, FullHttpResponse res) {
@@ -218,6 +220,20 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
     public void clearThreadCache() {
         THREAD_LOCAL_USER.remove();
         THREAD_LOCAL_RECEIVER.remove();
+    }
+
+    /** 设置接收者
+     * @param receiver
+     */
+    public static void setReceiver(String receiver) {
+        THREAD_LOCAL_RECEIVER.set(receiver);
+    }
+
+    /**
+     * 设置聊天室
+     */
+    public static void setChatroom(String chatroom) {
+        THREAD_CHATROOM.set(chatroom);
     }
 
 }
