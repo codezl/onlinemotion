@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 
 import java.net.InetSocketAddress;
 import java.util.Date;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -38,6 +39,12 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
     private static final ThreadLocal<String> THREAD_LOCAL_RECEIVER = new ThreadLocal<>();
     // 除了记录reciever也可以使用聊天室的形式进行消息传递
     private static final ThreadLocal<String> THREAD_CHATROOM = new ThreadLocal<>();
+    // 因为threadlocal只能使用本线程获取，所以使用map的形式给外部开放接口设置参数
+    private static final ConcurrentMap<String,String> CONNECT_LINK = new ConcurrentHashMap<>();
+    // 也可以尝试将本线程存起来
+    private static final ConcurrentMap<String,Thread> USER_THREAD = new ConcurrentHashMap<>();
+    // 记录位置信息
+    private static final ConcurrentMap<String, String> USER_LOC = new ConcurrentHashMap<>();
 
     protected void messageReceived(ChannelHandlerContext ctx, Object msg) throws Exception {
         //传统的HTTP接入
@@ -119,12 +126,16 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
             System.out.print("\n连接地址" + uri + "\n");
             if (uri != null && !"/".equals(uri)) {
                 System.out.print("socket连接成功");
+                if (onlineWs.get(uri)!=null) {
+                     alreadyOnline(ctx,uri);
+                    // return;
+                }
                 MyChannelHandlerPool.add(uri, ctx);
                 onlineWs.put(uri, ctx);
                 THREAD_LOCAL_USER.set(uri);
                 // 做一些数据库初始化操作，比如初始化联系人（可能为掉线重连）
                 // 为了节省内存，也可以将建立连接的初始化数据，返回到客户端，保存在用户端
-                THREAD_LOCAL_RECEIVER.set("/zs");
+                // THREAD_LOCAL_RECEIVER.set("/zs");
                 initData();
             } else {
                 //消息返回
@@ -174,28 +185,13 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
         }
         try {
             MsgTransferDto.miniappMsg miniappMsg = JSONObject.parseObject(msg, MsgTransferDto.miniappMsg.class);
-            int msgType = miniappMsg.getMsgType();
-            dto.setMsgType(msgType);
-            if (msgType == 0) {
-                dto.setMsg("系统收到信息");
-                nowCtx.channel().write(new TextWebSocketFrame(JSONObject.toJSONString(dto)));
-            }else if (msgType == 1) {
-                String receiver = THREAD_LOCAL_RECEIVER.get();
-                // 或者通过信息传递
-                // String recv = miniappMsg.getReceiverUser();
-                ChannelHandlerContext recCtx = onlineWs.get(receiver);
-                if (recCtx == null) {
-                    dto.setMsg("用户不在线");
-                    nowCtx.channel().write(new TextWebSocketFrame(JSONObject.toJSONString(dto)));
-                }else {
-                    dto.setMsg(miniappMsg.getMsg());
-                    dto.setFromUser(THREAD_LOCAL_USER.get());
-                    recCtx.channel().writeAndFlush(new TextWebSocketFrame(JSONObject.toJSONString(dto)));
-                }
-            }else if (msgType == 2) {
-                //  双人聊天
+            Integer op = miniappMsg.getOp();
+            if (op == 0) {
+                sendMsg(nowCtx, dto, miniappMsg);
+            }else if (op == 1) {
+                // 建立连线
             }else {
-
+                uploadLoc(nowCtx,miniappMsg.getMsg());
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -207,12 +203,76 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
     }
 
     /**
+     * 发送信息的内部逻辑
+     */
+    public static void sendMsg(ChannelHandlerContext nowCtx,MsgTransferDto.serverMsg dto,MsgTransferDto.miniappMsg miniappMsg) {
+        int msgType = miniappMsg.getMsgType();
+        dto.setMsgType(msgType);
+        if (msgType == 0) {
+            dto.setMsg("收到系统信息:"+miniappMsg.getMsg());
+            nowCtx.channel().write(new TextWebSocketFrame(JSONObject.toJSONString(dto)));
+        }else if (msgType == 1) {
+            String receiver = THREAD_LOCAL_RECEIVER.get();
+            // 或者通过信息传递通信人
+            // String recv = miniappMsg.getReceiverUser();
+            ChannelHandlerContext recCtx = onlineWs.get(miniappMsg.getReceiver());
+            if (recCtx == null) {
+                dto.setMsg("用户不在线");
+                dto.setMsgType(404);
+                nowCtx.channel().write(new TextWebSocketFrame(JSONObject.toJSONString(dto)));
+            }else {
+                dto.setMsg(miniappMsg.getMsg());
+                dto.setFromUser(THREAD_LOCAL_USER.get());
+                recCtx.channel().writeAndFlush(new TextWebSocketFrame(JSONObject.toJSONString(dto)));
+            }
+        }else if (msgType == 2) {
+            //  双人聊天
+        }else {
+            //
+        }
+    }
+
+    /**
+     * 上传位置消息
+     * 只要在上传位置，就是在与好友共享位置
+     */
+    public static void uploadLoc(ChannelHandlerContext cxt,String loc) {
+        USER_LOC.put(THREAD_LOCAL_USER.get(),loc);
+        // 在连线的好友位置
+        // String s = USER_LOC.get(THREAD_LOCAL_RECEIVER.get());
+        String s = "23.073769,114.409414";
+        MsgTransferDto.serverMsg dto = new MsgTransferDto.serverMsg();
+        dto.setOp(3);
+        dto.setMsg(s);
+        cxt.channel().writeAndFlush(new TextWebSocketFrame(JSONObject.toJSONString(dto)));
+    }
+
+    /**
      * 初始化连接数据
      */
     public void initData() {
         // Data...
     }
 
+    /**
+     * 已经在线提示
+     * 或者清除已存在连接
+     */
+    public void alreadyOnline(ChannelHandlerContext cxt,String uri) {
+        // 1.清除原来的连接
+        ChannelHandlerContext old = onlineWs.get(uri);
+        onlineWs.remove(uri);
+        old.close();
+        // 2.发送已连接/重复上线信息
+        /**
+            MsgTransferDto.serverMsg dto = new MsgTransferDto.serverMsg();
+            dto.setMsgType(0);
+            dto.setMsg("已在线");
+            dto.setFromUser(THREAD_LOCAL_USER.get());
+            cxt.channel().writeAndFlush(new TextWebSocketFrame(JSONObject.toJSONString(dto)));
+            cxt.close();
+         */
+    }
 
     /**
      * 清除缓存方法
@@ -235,5 +295,22 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
     public static void setChatroom(String chatroom) {
         THREAD_CHATROOM.set(chatroom);
     }
+
+    /**
+     * 设置线程
+     */
+    public static void setUserThread(String user) {
+        USER_THREAD.put(user,Thread.currentThread());
+    }
+
+    /**
+     * 获取线程
+     */
+    public ThreadLocal getUserThread(String user) {
+        Thread t = USER_THREAD.get(user);
+        // 无法获取thread中的threadlocals
+        return null;
+    }
+
 
 }
