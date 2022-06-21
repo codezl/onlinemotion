@@ -20,15 +20,17 @@ public class MsgTransferDto {
         private String msg;
         private Date msgTime;
         // 信息类型，处理方式不同(0是发送给系统的消息。1是双人位置通信，2是双人聊天)
-        // 503 系统错误
+        // 503 系统错误 // 404用户不在线
         private Integer msgType;
+        // 操作类型，是发信息还是建立聊天还是上传位置等（考虑放到msgtype会混乱）
+        private Integer op;
     }
 
     @EqualsAndHashCode(callSuper = true)
     @Data
     public static class miniappMsg extends commonMsg{
         private int receiverId;
-        private String receiverUser;
+        private String receiver;
         // private int senderId;
     }
 
