@@ -1,8 +1,10 @@
 package com.codezl.onlinemotion.controller;
 
+import com.codezl.onlinemotion.socket.WebSocketServerHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -19,9 +21,10 @@ public class OnlineConnectController {
     @Autowired
     StringRedisTemplate redisTemplate;
 
-    @RequestMapping("connect2one")
+    @RequestMapping(value = "connect2one",method = RequestMethod.POST)
     public void connect2one(String toUser) {
-        String localUser = "19";
+        String localUser = "connect";
         redisTemplate.opsForValue().set("connect2one"+localUser,toUser);
+        WebSocketServerHandler.onlineWs.get("/z");
     }
 }
